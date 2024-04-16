@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GLSL</title>
+
+</head>
+
+<body style="margin: 0%;">
+    <canvas id="webglCanvas" style=" width: 800px; height: 800px; margin: 0%;"></canvas>
+
+    <script>
+        // Get the WebGL context from the canvas element
+        const canvas = document.getElementById('webglCanvas');
+        const gl = canvas.getContext('webgl');
+
+        // Define the vertex shader source code (simple passthrough)
+        const vertexShaderSource = `
+    attribute vec4 a_position;
+    void main() {
+        gl_Position = a_position;
+    }
+    `;
+
+        // Define the fragment shader source code
+        const fragmentShaderSource = `
+    precision highp float;
+    
+    #define MAX_STEPS 100
+    #define MAX_DIST 100.
+    #define SURF_DIST 0.01
+
+    float GetDist(vec3 p){
+        vec4 s = vec4(0, 1, 6, 1);
+
+        float sphereDist = length(p-s.xyz)-s.w;
+        float planeDist = p.y;
+
+        float d = min(sphereDist, planeDist);
+        return d;
+    }
+
+    float RayMarch(vec3 ro, vec3 rd){
+        float dO=0.;
+        
+        for(int i=0; i<MAX_STEPS; i++){
+            vec3 p = ro + rd*dO;
+            float dS = GetDist(p);
+            dO += dS;
+            if(dO>MAX_DIST || dS<SURF_DIST) break;
+
+        }
+        return dO;
+    }
+
+    uniform float time; // Uniform to control color change over time
+    void main() {
+        // Calculate color based on time
+        //vec3 color = vec3(sin(time), cos(time), abs(sin(time + 1.0)));
+        //vec2 uv = vec2(gl_FragCoord-.5*(200.))/(200.);
+        vec2 uv = vec2(gl_FragCoord-.5000*(20.))/(20.);
+
+        // vec2 uv;
+        // uv.x = gl_FragCoord.x/800.;
+        // uv.y = gl_FragCoord.y/450.;
+        // // uv -= .5;
+
+
+        vec3 col = vec3(0);
+
+        vec3 ro = vec3(0,1,(sin(time) * 3. + 1.));
+        // ro.
+        vec3 rd = normalize(vec3(uv.x,uv.y,1));
+
+        float d = RayMarch(ro, rd);
+
+        d /= 6.0;
+        col = vec3(d);
+        gl_FragColor = vec4(col,1.0);
+    }
+    //ro ray origin
+    //rd ray direction
+    //dO distance from origin
+    //dS distance to scene
+    //p point
+    //s sphere
+    //d total distance
+    `;
+
+        // Compile the shaders
+        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+        gl.shaderSource(vertexShader, vertexShaderSource);
+        gl.compileShader(vertexShader);
+
+        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(fragmentShader, fragmentShaderSource);
+        gl.compileShader(fragmentShader);
+
+        // Create the shader program
+        const shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        // Set up buffer with vertex data (a simple quad)
+        const positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        const positions = [
+            -1, -1,
+            1, -1,
+            -1, 1,
+            1, -1,
+            1, 1,
+            -1, 1,
+        ];
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+        // Get the attribute location for the vertex position
+        const positionAttributeLocation = gl.getAttribLocation(shaderProgram, 'a_position');
+        gl.enableVertexAttribArray(positionAttributeLocation);
+        gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
+
+        // Clear the canvas and draw the quad with the fragment shader
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(shaderProgram);
+
+        const timeUniformLoc = gl.getUniformLocation(shaderProgram, 'time');
+        let startTime = Date.now();
+
+        function render() {
+            const currentTime = (Date.now() - startTime) * 0.001; // Convert to seconds
+            gl.uniform1f(timeUniformLoc, currentTime);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            requestAnimationFrame(render);
+        }
+
+        render();
+    </script>
+</body>
+
+</html>
